@@ -96,7 +96,8 @@ contains
       corrected_y=local_y-current_state%local_grid%halo_size(Y_INDEX)
     end if
     
-    if(current_state%immersed%ib_enabled.and.current_state%immersed%ib_col(local_y, local_x))then
+    if(current_state%immersed%ib_enabled) then 
+      if(current_state%immersed%ib_col(local_y, local_x))then
       ! IB enabled
       do k=2,current_state%local_grid%size(Z_INDEX)
 #ifdef W_ACTIVE
@@ -145,6 +146,7 @@ contains
         end if
 #endif
       end do
+      endif
 
     else
       ! No IB

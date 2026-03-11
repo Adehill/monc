@@ -216,7 +216,8 @@ contains
     
 #ifdef W_ACTIVE
     if (.not. current_state%passive_th .and. current_state%th%active) then
-      if (current_state%immersed%ib_enabled .and. current_state%immersed%ib_col(j,i)) then 
+      if (current_state%immersed%ib_enabled ) then 
+        if ( current_state%immersed%ib_col(j,i) ) then 
         do k=2,current_state%local_grid%size(Z_INDEX)-1
           if (current_state%immersed%indic_w(k,j,i) .eq. 0 &
            .and. current_state%immersed%indic_s(k,j,i) .eq. 0 &
@@ -226,6 +227,7 @@ contains
                 current_state%sw%data(k,j,i)=current_state%sw%data(k,j,i)+w_buoyancy(k)
           end if
         end do
+        endif
       else
         do k=2,current_state%local_grid%size(Z_INDEX)-1    
           w_buoyancy(k)=(0.5_DEFAULT_PRECISION*current_state%global_grid%configuration%vertical%buoy_co(k))*&

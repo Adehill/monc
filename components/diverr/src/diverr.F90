@@ -127,7 +127,9 @@ contains
     
     p%data(:, y_local, x_local)=0.0_DEFAULT_PRECISION
     
-    if(current_state%immersed%ib_enabled.and.current_state%immersed%ib_col(y_local, x_local))then
+    if(current_state%immersed%ib_enabled) then 
+      
+      if(current_state%immersed%ib_col(y_local, x_local))then
       ! IB enabled
       do k=2,current_state%local_grid%size(Z_INDEX)
 #ifdef U_ACTIVE
@@ -151,6 +153,7 @@ contains
 #endif
           p%data(k, y_local, x_local)=p%data(k, y_local, x_local) * timec
       end do
+      endif
 
     else 
       ! No IB
