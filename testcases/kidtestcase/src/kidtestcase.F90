@@ -27,6 +27,7 @@ module kidtestcase_mod
   integer, parameter :: CASE_SC = 3
   integer, parameter :: CASE_SQUALL = 4
   integer, parameter :: CASE_HILL_FLOW = 5
+  integer, parameter :: CASE_1D = 6
 
 contains
 
@@ -58,6 +59,8 @@ contains
       call set_SQUALL_profiles(current_state) 
     case (CASE_HILL_FLOW)
       call set_2D_hills(current_state)
+    case (CASE_1D) 
+      call set_1D_profiles(current_state)
     end select
 
   end subroutine initialise_callback
@@ -309,7 +312,7 @@ contains
     
     call check_top(zztop, pheight(nlevs), 'kid_case:setup squall')
 
-    print *, zztop, pheight(nlevs)
+    !print *, zztop, pheight(nlevs)
 
     zgrid=current_state%global_grid%configuration%vertical%zn(:)
     
@@ -349,6 +352,8 @@ contains
       call set_2D_Sc(current_state)
     case (CASE_SQUALL)
       call set_2D_squall(current_state)
+    case (CASE_1D)
+       call set_1D_wind_field(current_state)
     end select
 
   end subroutine timestep_callback
@@ -892,6 +897,87 @@ contains
 
     deallocate(phi,  dxp, dzp)
   end subroutine set_2D_Hills
+
+
+  subroutine set_1D_profiles(current_state)
+    type(model_state_type), intent(inout), target :: current_state
+    real(kind=DEFAULT_PRECISION), allocatable :: &
+        pHeight(:)         & ! height
+       ,pTheta(:)          & ! theta
+       ,pqv(:)               ! qv
+
+    real(kind=DEFAULT_PRECISION), allocatable :: zgrid(:)  ! z grid to use in interpolation   
+    
+    integer :: i,j,iq
+
+    real(kind=DEFAULT_PRECISION) :: zztop ! top of the domain
+    
+    zztop = current_state%global_grid%top(Z_INDEX)
+    
+    allocate(pHeight(3))
+    allocate(pTheta(3))
+    allocate(pqv(3))
+        
+    pheight=(/ 0., 740., 3260./)
+    ptheta=(/ 297.9, 297.9, 312.66 /)
+    pqv=(/ .015, .0138, .0024 /)
+   
+    allocate(zgrid(current_state%local_grid%local_domain_end_index(Z_INDEX)))
+    zgrid=current_state%global_grid%configuration%vertical%zn(:)
+
+    call check_top(zztop, pheight(3), 'kid_case:setup 1D')
+
+    call piecewise_linear_1d(pHeight, ptheta, zgrid, &
+         current_state%global_grid%configuration%vertical%thref)
+    
+    current_state%global_grid%configuration%vertical%theta_init = current_state%global_grid%configuration%vertical%thref
+    current_state%th%data=0.0
+
+    iq=get_q_index(standard_q_names%VAPOUR, 'kidtestcase-1d')
+
+    call piecewise_linear_1d(pheight, pqv, zgrid, &
+       current_state%global_grid%configuration%vertical%q_init(:,iq))
+
+     do i=current_state%local_grid%local_domain_start_index(X_INDEX), current_state%local_grid%local_domain_end_index(X_INDEX)
+      do j=current_state%local_grid%local_domain_start_index(Y_INDEX), current_state%local_grid%local_domain_end_index(Y_INDEX)
+        current_state%q(iq)%data(:,j,i) = current_state%global_grid%configuration%vertical%q_init(:, iq)
+      end do
+    end do
+
+    !print *, current_state%global_grid%configuration%vertical%q_init(:, iq)
+    !print *, current_state%global_grid%configuration%vertical%thref
+    
+    deallocate(pqv)
+    deallocate(pTheta)
+    deallocate(pHeight)
+
+  end subroutine set_1D_profiles 
+
+  subroutine set_1D_wind_field(current_state)
+    type(model_state_type), intent(inout), target :: current_state
+    
+    integer, parameter :: nctrl = 8
+    real(kind=DEFAULT_PRECISION), dimension(nctrl) :: &
+         tctrl=0.          & ! control time values
+        , wctrl=0.
+    real(DEFAULT_PRECISION) :: t     ! temporary local time variable
+
+    if (all(tctrl==0.))tctrl(1:2)=(/3600., 600./)
+    if (all(wctrl==0.))wctrl(1)=2.
+    
+    t=current_state%time
+    
+    if (t < tctrl(2))then
+       current_state%zw%data(:,:,:) = wctrl(1)*sin(pi*t/tctrl(2))
+       !print *, current_state%zw%data(:,:,:)       
+    else
+       current_state%zw%data(:,:,:) = 0.0
+    end if
+
+     current_state%w%data(:,:,:)= current_state%zw%data(:,:,:)
+
+  end subroutine set_1D_wind_field
+
 
   subroutine check_top(zztop, z, info)
     real(kind=DEFAULT_PRECISION), intent(in) :: zztop
