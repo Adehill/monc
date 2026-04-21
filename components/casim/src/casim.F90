@@ -586,6 +586,8 @@ contains
     dCoarseSolNumber = 0.0
     ActiveSolLiquid = 0.0
     dActiveSolLiquid = 0.0
+    ActiveSolRain = 0.0
+    dActiveSolRain = 0.0
     CoarseDustMass = 0.0
     dCoarseDustMass = 0.0
     CoarseDustNumber = 0.0
@@ -608,6 +610,26 @@ contains
     AccumSolBk = 0.0 
     CoarseSolBk = 0.0
 
+    ! Zero all hydrometeor tendency arrays before loading from MONC state.
+    ! CASIM computes k_start=kls=2 to kte only, so k=1 is never updated by
+    ! CASIM.  Zeroing here ensures the writeback adds 0 at level k=1 rather
+    ! than doubling the old tendency already present in sq/sth.
+    dth  = 0.0_wp
+    dqv  = 0.0_wp
+    dqc  = 0.0_wp
+    dnc  = 0.0_wp
+    dqr  = 0.0_wp
+    dnr  = 0.0_wp
+    dm3r = 0.0_wp
+    dqi  = 0.0_wp
+    dni  = 0.0_wp
+    dqs  = 0.0_wp
+    dns  = 0.0_wp
+    dm3s = 0.0_wp
+    dqg  = 0.0_wp
+    dng  = 0.0_wp
+    dm3g = 0.0_wp
+
     theta(:,1,1) = current_state%zth%data(:, jcol, icol) + current_state%global_grid%configuration%vertical%thref(:)
     dth(:,1,1) = current_state%sth%data(:, jcol, icol)
     exner(:,1,1) = current_state%global_grid%configuration%vertical%rprefrcp(:)
@@ -621,11 +643,14 @@ contains
     qv(:,1,1) = current_state%zq(iqx)%data(:,jcol,icol)
     dqv(:,1,1) = current_state%sq(iqx)%data(:,jcol,icol)
 
-    cfliq(:,1,1) = 1.0_wp
-    cfice(:,1,1) = 1.0_wp
-    cfsnow(:,1,1) = 1.0_wp
-    cfrain(:,1,1) = 1.0_wp
-    cfgr(:,1,1) = 1.0_wp
+    ! Initialise cloud fractions to 0; set to 1 below only where the
+    ! corresponding hydrometeor field is active (MONC has no subgrid cloud
+    ! fraction scheme, so the per-column value is 0 or 1).
+    cfliq(:,1,1) = 0.0_wp
+    cfice(:,1,1) = 0.0_wp
+    cfsnow(:,1,1) = 0.0_wp
+    cfrain(:,1,1) = 0.0_wp
+    cfgr(:,1,1) = 0.0_wp
 
     ! Warm microphysical fields
     IF (nq_l > 0)then
@@ -717,6 +742,8 @@ contains
     if (i_CoarseSolNumber>0)  dCoarseSolNumber(:,1,1)   = current_state%sq(i_CoarseSolNumber)%data(:,jcol,icol)
     if (i_ActiveSolLiquid>0)   ActiveSolLiquid(:,1,1)    = current_state%zq(i_ActiveSolLiquid)%data(:,jcol,icol)
     if (i_ActiveSolLiquid>0)  dActiveSolLiquid(:,1,1)   = current_state%sq(i_ActiveSolLiquid)%data(:,jcol,icol)
+    if (i_ActiveSolRain>0)     ActiveSolRain(:,1,1)      = current_state%zq(i_ActiveSolRain)%data(:,jcol,icol)
+    if (i_ActiveSolRain>0)    dActiveSolRain(:,1,1)     = current_state%sq(i_ActiveSolRain)%data(:,jcol,icol)
     if (i_CoarseDustMass>0)    CoarseDustMass(:,1,1)     = current_state%zq(i_CoarseDustMass)%data(:,jcol,icol)
     if (i_CoarseDustMass>0)   dCoarseDustMass(:,1,1)    = current_state%sq(i_CoarseDustMass)%data(:,jcol,icol)
     if (i_CoarseDustNumber>0)  CoarseDustNumber(:,1,1)   = current_state%zq(i_CoarseDustNumber)%data(:,jcol,icol)
@@ -868,6 +895,8 @@ contains
        =  current_state%sq(i_CoarseSolNumber)%data(:,jcol,icol) + dCoarseSolNumber(:,1,1)
     if (i_ActiveSolLiquid>0)   current_state%sq(i_ActiveSolLiquid)%data(:,jcol,icol) &
        =  current_state%sq(i_ActiveSolLiquid)%data(:,jcol,icol) + dActiveSolLiquid(:,1,1)
+    if (i_ActiveSolRain>0)     current_state%sq(i_ActiveSolRain)%data(:,jcol,icol) &
+       =  current_state%sq(i_ActiveSolRain)%data(:,jcol,icol) + dActiveSolRain(:,1,1)
     if (i_CoarseDustMass>0)    current_state%sq(i_CoarseDustMass)%data(:,jcol,icol) &
        =  current_state%sq(i_CoarseDustMass)%data(:,jcol,icol) + dCoarseDustMass(:,1,1)
     if (i_CoarseDustNumber>0)  current_state%sq(i_CoarseDustNumber)%data(:,jcol,icol) &
@@ -902,6 +931,10 @@ contains
     else
        surface_precip(target_y_index,target_x_index) = &
             casdiags % SurfaceRainR(1,1) + casdiags % SurfaceSnowR(1,1)
+       surface_cloudsed(target_y_index,target_x_index) = &
+            casdiags % SurfaceCloudR(1,1)
+       surface_rainsed(target_y_index,target_x_index) = &
+            casdiags % SurfaceRainR(1,1) - casdiags % SurfaceCloudR(1,1)
     endif
     call populate_casim_monc_dg(current_state, casdiags)
 
